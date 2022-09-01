@@ -79,23 +79,16 @@ func getFlist(metaURL, fileName string) (string, error) {
 }
 
 // unpackFlistArchive unpacks a tgz flist (archive) from flistPath
-// to a tmp location at "/var/lib/flist/tmp/{fileName}"
+// to a tmp location at "/var/lib/flist/tmp/"
 func unpackFlistArchive(flistPath, fileName string) (string, error) {
-	if err := os.MkdirAll(flistsUnpackedPath, 0770); err != nil {
-		return "", err
-	}
-
 	f, err := os.Open(flistPath)
 	if err != nil {
 		return "", err
 	}
 
-	err = os.MkdirAll(flistsUnpackedPath, 0770)
-	if err != nil {
-		return "", err
-	}
+	tmpFlistDir := fmt.Sprintf("%s/%s", flistsUnpackedPath, fileName)
 
-	tmpFlistDir, err := os.MkdirTemp(flistsUnpackedPath, fileName)
+	err = os.MkdirAll(tmpFlistDir, 0770)
 	if err != nil {
 		return "", err
 	}
@@ -109,9 +102,6 @@ func unpackFlistArchive(flistPath, fileName string) (string, error) {
 // mountFlist mounts flist stored on disk at flistPath, then
 // runs the executable at entrypoint
 func mountFlist(flistPath, fileName, entrypoint string) error {
-	if err := os.MkdirAll(flistsContainersPath, 0770); err != nil {
-		return err
-	}
 	tmpFlistDir, err := unpackFlistArchive(flistPath, fileName)
 	if err != nil {
 		return err
@@ -127,15 +117,23 @@ func mountFlist(flistPath, fileName, entrypoint string) error {
 		return err
 	}
 
-	containerPath := fmt.Sprintf("%s/%s",flistsContainersPath, fileName)
-	err = os.MkdirAll(fmt.Sprintf("%s/%s", containerPath, "mnt"), 0770)
+	err = os.MkdirAll(flistsContainersPath, 0770)
 	if err != nil {
 		return err
 	}
 
+	containerDir, err := os.MkdirTemp(flistsContainersPath, fileName)
+	if err != nil {
+		return err
+	}
+
+	mountpoint := fmt.Sprintf("%s/%s", containerDir, "mnt")
+	if err = os.MkdirAll(mountpoint, 0770); err != nil {
+		return err
+	}
 	opt := g8ufs.Options {
-		Backend: fmt.Sprintf("%s/%s",containerPath, "backend"),
-		Target: fmt.Sprintf("%s/%s", containerPath, "mnt"),
+		Backend: fmt.Sprintf("%s/%s", containerDir, "backend"),
+		Target: mountpoint,
 		Store: metaStore,
 		Storage: storageHub,
 		Reset: true,
