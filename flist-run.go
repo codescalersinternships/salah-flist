@@ -8,6 +8,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	g8ufs "github.com/threefoldtech/0-fs"
+	"github.com/threefoldtech/0-fs/meta"
+	"github.com/threefoldtech/0-fs/storage"
 )
 
 // downloadFlist downloads flist form metaURL into filepath
@@ -56,13 +60,12 @@ func buildFileName(metaURL string) (string, error) {
 
 // getFlist returns filepath of flist on disk, if file doesn't exist on disk
 // downloads the flist from given metaURL and save to disk.
-func getFlist(metaURL string) (string, error) {
-	fileName, err := buildFileName(metaURL)
-	if err != nil {
+func getFlist(metaURL, fileName string) (string, error) {
+	if err := os.MkdirAll(flistsStorePath, 0770); err != nil {
 		return "", err
 	}
 
-	filePath := fmt.Sprintf("%s/%s", flistsPath, fileName)
+	filePath := fmt.Sprintf("%s/%s", flistsStorePath, fileName)
 
 	if _, err := os.Stat(filePath); err != nil {
 		log.Printf("flist %s doesn't exist and needs to get downloaded from %s\n", fileName, metaURL)
@@ -75,13 +78,100 @@ func getFlist(metaURL string) (string, error) {
 	return filePath, nil
 }
 
-// Run subcommand to execute binary at given entrypoint after mounting given flist
-func Run(metaURL string, entrypoint string) error {
-	filePath, err := getFlist(metaURL)
+// unpackFlistArchive unpacks a tgz flist (archive) from flistPath
+// to a tmp location at "/var/lib/flist/tmp/{fileName}"
+func unpackFlistArchive(flistPath, fileName string) (string, error) {
+	if err := os.MkdirAll(flistsUnpackedPath, 0770); err != nil {
+		return "", err
+	}
+
+	f, err := os.Open(flistPath)
+	if err != nil {
+		return "", err
+	}
+
+	err = os.MkdirAll(flistsUnpackedPath, 0770)
+	if err != nil {
+		return "", err
+	}
+
+	tmpFlistDir, err := os.MkdirTemp(flistsUnpackedPath, fileName)
+	if err != nil {
+		return "", err
+	}
+
+	if err := meta.Unpack(f, tmpFlistDir); err != nil {
+		return "", err
+	}
+	return tmpFlistDir, nil
+}
+
+// mountFlist mounts flist stored on disk at flistPath, then
+// runs the executable at entrypoint
+func mountFlist(flistPath, fileName, entrypoint string) error {
+	if err := os.MkdirAll(flistsContainersPath, 0770); err != nil {
+		return err
+	}
+	tmpFlistDir, err := unpackFlistArchive(flistPath, fileName)
 	if err != nil {
 		return err
 	}
 
+	metaStore, err := meta.NewStore(tmpFlistDir)
+	if err != nil {
+		return err
+	}
 
+	storageHub, err := storage.NewSimpleStorage(defaultStorageHubPath)
+	if err != nil {
+		return err
+	}
+
+	containerPath := fmt.Sprintf("%s/%s",flistsContainersPath, fileName)
+	err = os.MkdirAll(fmt.Sprintf("%s/%s", containerPath, "mnt"), 0770)
+	if err != nil {
+		return err
+	}
+
+	opt := g8ufs.Options {
+		Backend: fmt.Sprintf("%s/%s",containerPath, "backend"),
+		Target: fmt.Sprintf("%s/%s", containerPath, "mnt"),
+		Store: metaStore,
+		Storage: storageHub,
+		Reset: true,
+	}
+
+	fs, err := g8ufs.Mount(&opt)
+	if err != nil {
+		return err
+	}
+
+	err = fs.Wait()
+	if err != nil {
+		return err
+	}
+	err = fs.Unmount()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Run subcommand to execute binary at given entrypoint after mounting given flist
+func Run(metaURL, entrypoint string) error {
+	fileName, err := buildFileName(metaURL)
+	if err != nil {
+		return err
+	}
+
+	flistPath, err := getFlist(metaURL, fileName)
+	if err != nil {
+		return err
+	}
+
+	err = mountFlist(flistPath, fileName, entrypoint)
+	if err != nil {
+		return err
+	}
 	return nil
 }
