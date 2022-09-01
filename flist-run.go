@@ -101,38 +101,24 @@ func unpackFlistArchive(flistPath, fileName string) (string, error) {
 
 // mountFlist mounts flist stored on disk at flistPath, then
 // runs the executable at entrypoint
-func mountFlist(flistPath, fileName, entrypoint string) error {
+func mountFlist(flistPath, fileName, containerDirPath, mountpoint string) (*g8ufs.G8ufs, error) {
 	tmpFlistDir, err := unpackFlistArchive(flistPath, fileName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	metaStore, err := meta.NewStore(tmpFlistDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	storageHub, err := storage.NewSimpleStorage(defaultStorageHubPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = os.MkdirAll(flistsContainersPath, 0770)
-	if err != nil {
-		return err
-	}
-
-	containerDir, err := os.MkdirTemp(flistsContainersPath, fileName)
-	if err != nil {
-		return err
-	}
-
-	mountpoint := fmt.Sprintf("%s/%s", containerDir, "mnt")
-	if err = os.MkdirAll(mountpoint, 0770); err != nil {
-		return err
-	}
 	opt := g8ufs.Options {
-		Backend: fmt.Sprintf("%s/%s", containerDir, "backend"),
+		Backend: fmt.Sprintf("%s/%s", containerDirPath, "backend"),
 		Target: mountpoint,
 		Store: metaStore,
 		Storage: storageHub,
@@ -141,18 +127,10 @@ func mountFlist(flistPath, fileName, entrypoint string) error {
 
 	fs, err := g8ufs.Mount(&opt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = fs.Wait()
-	if err != nil {
-		return err
-	}
-	err = fs.Unmount()
-	if err != nil {
-		return err
-	}
-	return nil
+	return fs, nil
 }
 
 // Run subcommand to execute binary at given entrypoint after mounting given flist
@@ -167,8 +145,33 @@ func Run(metaURL, entrypoint string) error {
 		return err
 	}
 
-	err = mountFlist(flistPath, fileName, entrypoint)
+	err = os.MkdirAll(flistsContainersPath, 0770)
 	if err != nil {
+		return err
+	}
+
+	containerDirPath, err := os.MkdirTemp(flistsContainersPath, fileName)
+	if err != nil {
+		return err
+	}
+
+	mountpoint := fmt.Sprintf("%s/%s", containerDirPath, "mnt")
+	if err = os.MkdirAll(mountpoint, 0770); err != nil {
+		return err
+	}
+
+	fs, err := mountFlist(flistPath, fileName, containerDirPath, mountpoint)
+	if err != nil {
+		return err
+	}
+	
+	// To-Do: binary execution
+
+	if err = fs.Wait(); err != nil {
+		return err
+	}
+
+	if err = fs.Unmount(); err != nil {
 		return err
 	}
 	return nil
