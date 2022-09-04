@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 
 	g8ufs "github.com/threefoldtech/0-fs"
 	"github.com/threefoldtech/0-fs/meta"
@@ -159,20 +161,63 @@ func Run(metaURL, entrypoint string) error {
 	if err = os.MkdirAll(mountpoint, 0770); err != nil {
 		return err
 	}
+	if err := os.MkdirAll(mountpoint + "/proc", 0777); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(mountpoint + "/tmp", 0777); err != nil {
+		return err
+	}
 
 	fs, err := mountFlist(flistPath, fileName, containerDirPath, mountpoint)
 	if err != nil {
 		return err
 	}
-	
+
 	// To-Do: binary execution
+	go func () error {
+		if err := syscall.Chroot(mountpoint); err != nil {
+			log.Println(err)
+			return err
+		}
+		if err := syscall.Chdir("/"); err != nil {
+			log.Println(err)
+			return err
+		}
 
-	if err = fs.Wait(); err != nil {
+		if err := syscall.Mount("proc", "proc", "proc", 0, ""); err != nil {
+			log.Println(err)
+			return err
+		}
+		if err := syscall.Mount("tmp", "tmp", "tmpfs", 0, ""); err != nil {
+			log.Println(err)
+			return err
+		}
+
+		cmd := exec.Command(entrypoint)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		err := cmd.Run()
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		return nil
+	} ()
+
+	
+	fs.Wait()
+
+	if err := syscall.Unmount("proc", 0); err != nil {
+		return err
+	}
+	if err := syscall.Unmount("tmp", 0); err != nil {
+		return err
+	}
+	if err := fs.Unmount(); err != nil {
 		return err
 	}
 
-	if err = fs.Unmount(); err != nil {
-		return err
-	}
 	return nil
 }
