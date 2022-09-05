@@ -1,5 +1,5 @@
 package main
 
-func (d *Daemon) stop() {
+func (w *Worker) stop() {
 
 }

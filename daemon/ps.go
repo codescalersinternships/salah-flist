@@ -1,5 +1,5 @@
 package main
 
-func (d *Daemon) ps() {
+func (w *Worker) ps() {
 
 }

@@ -6,6 +6,17 @@ import (
 	"os"
 )
 
+type Flist struct {
+	Command string			`json:"command"`
+	MetaURL string			`json:"metaURL"`
+	Entrypoint string		`json:"entrypoint"`
+	ContainerName string	`json:"containerName"`
+}
+
+func new() *Flist {
+	return &Flist{ }
+}
+
 const SockAddr = "/tmp/flist.sock"
 
 func main() {

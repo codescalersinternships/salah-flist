@@ -1,10 +1,19 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
+	"log"
 	"net"
 )
 
 func ps(conn net.Conn) {
-	writeData(conn, fmt.Sprintf("%s\n", "ps"))
+	flist := new()
+	flist.Command = "ps"
+	
+	data, err := json.Marshal(flist)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	writeData(conn, data)
 }

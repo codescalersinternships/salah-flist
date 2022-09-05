@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -20,7 +20,15 @@ func run(conn net.Conn) {
 		os.Exit(1)
 	}
 
-	writeData(conn, fmt.Sprintf("%s\n", runCmd.Name()))
-	writeData(conn, fmt.Sprintf("%s\n", *runMetaURL))
-	writeData(conn, fmt.Sprintf("%s\n", *runEntryPoint))
+	flist := new()
+	flist.Command = runCmd.Name()
+	flist.MetaURL = *runMetaURL
+	flist.Entrypoint = *runEntryPoint
+
+	data, err := json.Marshal(flist)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	writeData(conn, data)
 }

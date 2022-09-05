@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -19,6 +19,14 @@ func stop(conn net.Conn) {
 		os.Exit(1)
 	}
 
-	writeData(conn, fmt.Sprintf("%s\n", stopCmd.Name()))
-	writeData(conn, fmt.Sprintf("%s\n", *stopContainerName))
+	flist := new()
+	flist.Command = stopCmd.Name()
+	flist.ContainerName = *stopContainerName
+
+	data, err := json.Marshal(flist)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	writeData(conn, data)
 }

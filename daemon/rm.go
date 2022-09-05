@@ -1,5 +1,5 @@
 package main
 
-func (d *Daemon) rm() {
+func (w *Worker) rm() {
 
 }
