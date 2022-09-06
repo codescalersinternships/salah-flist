@@ -5,6 +5,10 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
+
+	g8ufs "github.com/threefoldtech/0-fs"
 )
 
 const (
@@ -15,7 +19,7 @@ const (
 	RmCmd = "rm"
 	PsCmd = "ps"
 
-	StorePath = "/var/lib/flist/store" // redis.flist
+	StorePath = "/var/lib/flist/store"
 	ContainersPath = "/var/lib/flist/containers"
 	flistsUnpackedPath = "/var/lib/flist/tmp"
 	defaultStorageHubPath = "zdb://hub.grid.tf:9900"
@@ -26,6 +30,7 @@ type Flist struct {
 	MetaURL string			`json:"metaURL"`
 	Entrypoint string		`json:"entrypoint"`
 	ContainerName string	`json:"containerName"`
+	Mountpoint string		`json:"mountpoint"`
 }
 
 type Container struct {
@@ -35,6 +40,7 @@ type Container struct {
 }
 
 type Worker struct {
+	fs *g8ufs.G8ufs
 	Conn net.Conn
 	Flist Flist
 	Containers []Container
@@ -47,8 +53,8 @@ func new(containers []Container) *Worker {
 func (w *Worker) serve() {
 	if err := json.NewDecoder(w.Conn).Decode(&w.Flist); err != nil {
 		log.Fatal(err)
-		return
 	}
+
 	switch w.Flist.Command {
 	case RunCmd:
 		w.run()
@@ -58,6 +64,29 @@ func (w *Worker) serve() {
 		w.rm()
 	case PsCmd:
 		w.ps()
+	}
+}
+
+func (w *Worker) Signal(sigchnl chan os.Signal) {
+	sigs := []os.Signal {syscall.SIGUSR1}
+	
+	signal.Notify(sigchnl, sigs...)
+
+	go w.signalsHandler(sigchnl)
+}
+
+func (w *Worker) signalsHandler(sigchnl chan os.Signal) {
+	for sig := range sigchnl {
+		switch sig {
+		default:
+			w.unmountContainer()
+		}
+	}
+}
+
+func (w *Worker) unmountContainer() {
+	if err := w.fs.Unmount(); err != nil {
+		log.Println(err)
 	}
 }
 

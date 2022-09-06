@@ -7,8 +7,7 @@ import (
 )
 
 func ps(conn net.Conn) {
-	flist := new()
-	flist.Command = "ps"
+	flist := new("ps", "", "", "")
 	
 	data, err := json.Marshal(flist)
 	if err != nil {

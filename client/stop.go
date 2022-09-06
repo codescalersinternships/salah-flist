@@ -19,9 +19,7 @@ func stop(conn net.Conn) {
 		os.Exit(1)
 	}
 
-	flist := new()
-	flist.Command = stopCmd.Name()
-	flist.ContainerName = *stopContainerName
+	flist := new(stopCmd.Name(), "", "", *stopContainerName)
 
 	data, err := json.Marshal(flist)
 	if err != nil {

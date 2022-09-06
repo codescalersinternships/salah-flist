@@ -19,9 +19,7 @@ func rm(conn net.Conn) {
 		os.Exit(1)
 	}
 
-	flist := new()
-	flist.Command = rmCmd.Name()
-	flist.ContainerName = *rmContainerName
+	flist := new(rmCmd.Name(), "", "", *rmContainerName)
 
 	data, err := json.Marshal(flist)
 	if err != nil {

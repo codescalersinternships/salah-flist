@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"syscall"
 
@@ -137,6 +135,10 @@ func mountFlist(flistPath, fileName, containerDirPath, mountpoint string) (*g8uf
 }
 
 func (w *Worker) run() {
+	if _, err := w.Conn.Write([]byte(fmt.Sprintf("%d", os.Getpid()))); err != nil {
+		log.Fatal(err)
+	}
+
 	fileName, err := buildFileName(w.Flist.MetaURL)
 	if err != nil {
 		log.Fatal(err)
@@ -161,16 +163,16 @@ func (w *Worker) run() {
 		log.Fatal(err)
 	}
 
-	fs, err := mountFlist(flistPath, fileName, containerDirPath, mountpoint)
+	w.fs, err = mountFlist(flistPath, fileName, containerDirPath, mountpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	procPath := fmt.Sprintf("%s/%s", mountpoint, "proc")
+	
+	procPath := fmt.Sprintf("%s/proc", mountpoint)
 	if err := os.MkdirAll(procPath, 0777); err != nil {
 		log.Fatal(err)
 	}
-	tmpPath := fmt.Sprintf("%s/%s", mountpoint, "tmp")
+	tmpPath := fmt.Sprintf("%s/tmp", mountpoint)
 	if err := os.MkdirAll(tmpPath, 0777); err != nil {
 		log.Fatal(err)
 	}
@@ -182,34 +184,12 @@ func (w *Worker) run() {
 		log.Fatal(err)
 	}
 
-	runtime.LockOSThread()
-
-	if err := syscall.Chroot(mountpoint); err != nil {
-		log.Fatal(err)
-	}
-	if err := syscall.Chdir("/"); err != nil {
-		log.Fatal(err)
-	}
-
-
-	cmd := exec.Command(w.Flist.Entrypoint)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		log.Fatal(err)
-	}
-
-	runtime.UnlockOSThread()
+	sigchnl := make(chan os.Signal)
+	w.Signal(sigchnl)
 	
-	if err := syscall.Unmount("proc", 0); err != nil {
+	err = w.fs.Wait();
+	if err != nil {
 		log.Fatal(err)
 	}
-	if err := syscall.Unmount("tmp", 0); err != nil {
-		log.Fatal(err)
-	}
-	if err := fs.Unmount(); err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("Container at %v unmounted successfully", containerDirPath)
 }
