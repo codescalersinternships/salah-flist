@@ -131,6 +131,22 @@ func mountFlist(flistPath, fileName, containerDirPath, mountpoint string) (*g8uf
 		return nil, err
 	}
 
+	procPath := fmt.Sprintf("%s/proc", mountpoint)
+	if err := os.MkdirAll(procPath, 0777); err != nil {
+		log.Fatal(err)
+	}
+	tmpPath := fmt.Sprintf("%s/tmp", mountpoint)
+	if err := os.MkdirAll(tmpPath, 0777); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := syscall.Mount(procPath, procPath, "proc", 0, ""); err != nil {
+		log.Fatal(err)
+	}
+	if err := syscall.Mount(tmpPath, tmpPath, "tmpfs", 0, ""); err != nil {
+		log.Fatal(err)
+	}
+
 	return fs, nil
 }
 
@@ -165,22 +181,6 @@ func (w *Worker) run() {
 
 	w.fs, err = mountFlist(flistPath, fileName, containerDirPath, mountpoint)
 	if err != nil {
-		log.Fatal(err)
-	}
-	
-	procPath := fmt.Sprintf("%s/proc", mountpoint)
-	if err := os.MkdirAll(procPath, 0777); err != nil {
-		log.Fatal(err)
-	}
-	tmpPath := fmt.Sprintf("%s/tmp", mountpoint)
-	if err := os.MkdirAll(tmpPath, 0777); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := syscall.Mount(procPath, procPath, "proc", 0, ""); err != nil {
-		log.Fatal(err)
-	}
-	if err := syscall.Mount(tmpPath, tmpPath, "tmpfs", 0, ""); err != nil {
 		log.Fatal(err)
 	}
 

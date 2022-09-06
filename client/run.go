@@ -60,4 +60,6 @@ func run(conn net.Conn) {
 	}
 
 	runtime.UnlockOSThread()
+
+	tellDaemonToUnmountFlist()
 }
