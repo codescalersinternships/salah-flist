@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -24,6 +25,8 @@ func run(conn net.Conn) {
 		log.Fatal(err)
 	}
 	writeData(conn, flistData)
+	
+	fmt.Println(flist)
 
 	DaemonPid = getDaemonPid(conn)
 
@@ -61,5 +64,5 @@ func run(conn net.Conn) {
 
 	runtime.UnlockOSThread()
 
-	tellDaemonToUnmountFlist()
+	tellDaemonToCleanupContainer()
 }

@@ -15,6 +15,16 @@ import (
 	"github.com/threefoldtech/0-fs/storage"
 )
 
+var (
+	StorePath = "/var/lib/flist/store"
+	ContainersPath = "/var/lib/flist/containers"
+	flistsUnpackedPath = "/var/lib/flist/tmp"
+	defaultStorageHubPath = "zdb://hub.grid.tf:9900"
+
+	Running = "Running"
+	Stopped = "Stopped"
+)
+
 // buildFileName builds flist's file name from metaURL
 func buildFileName(metaURL string) (string, error) {
 	u, err := url.Parse(metaURL)
@@ -133,18 +143,18 @@ func mountFlist(flistPath, fileName, containerDirPath, mountpoint string) (*g8uf
 
 	procPath := fmt.Sprintf("%s/proc", mountpoint)
 	if err := os.MkdirAll(procPath, 0777); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	tmpPath := fmt.Sprintf("%s/tmp", mountpoint)
 	if err := os.MkdirAll(tmpPath, 0777); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	if err := syscall.Mount(procPath, procPath, "proc", 0, ""); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	if err := syscall.Mount(tmpPath, tmpPath, "tmpfs", 0, ""); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return fs, nil
@@ -152,44 +162,65 @@ func mountFlist(flistPath, fileName, containerDirPath, mountpoint string) (*g8uf
 
 func (w *Worker) run() {
 	if _, err := w.Conn.Write([]byte(fmt.Sprintf("%d", os.Getpid()))); err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	fileName, err := buildFileName(w.Flist.MetaURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	flistPath, err := getFlist(w.Flist.MetaURL, fileName)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	if err := os.MkdirAll(ContainersPath, 0770); err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	containerDirPath, err := os.MkdirTemp(ContainersPath, fileName)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
+	s := strings.Split(containerDirPath, "/")
+	containerId := s[len(s)-1]
+	w.Flist.ContainerName = containerId
 
 	mountpoint := fmt.Sprintf("%s/%s", containerDirPath, "mnt")
 	if err = os.MkdirAll(mountpoint, 0770); err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	w.fs, err = mountFlist(flistPath, fileName, containerDirPath, mountpoint)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
+
+	container := Container {
+		Id: containerId,
+		Path: containerDirPath,
+		Status: Running,
+		Pid: w.Flist.ProcessPid,
+		fs: w.fs,
+	}
+	fmt.Println(container)
+	w.Containers[container.Id] = container
 
 	sigchnl := make(chan os.Signal)
 	w.Signal(sigchnl)
 	
 	err = w.fs.Wait();
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 	log.Printf("Container at %v unmounted successfully", containerDirPath)
 }

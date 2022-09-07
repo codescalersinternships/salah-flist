@@ -14,6 +14,7 @@ type Flist struct {
 	Entrypoint string		`json:"entrypoint"`
 	Arg []string			`json:"arg"`
 	ContainerName string	`json:"containerName"`
+	ProcessPid int			`json:"processPid"`
 	Mountpoint string		`json:"mountpoint"`
 }
 
@@ -24,12 +25,13 @@ func new(command, meta, entrypoint, containerName string, arg ...string) *Flist 
 		Entrypoint: entrypoint,
 		Arg: arg,
 		ContainerName: containerName,
+		ProcessPid: os.Getpid(),
 		Mountpoint: "",
 	}
 }
 
 func Signal(sigchnl chan os.Signal) {
-	sigs := []os.Signal {syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGHUP}
+	sigs := []os.Signal {syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGUSR1, syscall.SIGUSR2}
 	
 	signal.Notify(sigchnl, sigs...)
 
@@ -39,16 +41,29 @@ func Signal(sigchnl chan os.Signal) {
 func signalsHandler(sigchnl chan os.Signal) {
 	for sig := range sigchnl {
 		switch sig {
-		default:
-			tellDaemonToUnmountFlist()
+		case syscall.SIGUSR1:
+			handleSuccessOperation()
+		case syscall.SIGUSR2:
+			handleFailureOperation()
+		case syscall.SIGINT:
+			tellDaemonToCleanupContainer()
 		}
 	}
 }
 
-func tellDaemonToUnmountFlist() {
+func tellDaemonToCleanupContainer() {
 	syscall.Kill(DaemonPid, syscall.SIGUSR1)
 
 	os.Exit(1)
+}
+
+func handleSuccessOperation() {
+	done <- true
+}
+
+func handleFailureOperation() {
+	log.Println("container name doesn't exist")
+	done <- false
 }
 
 const SockAddr = "/tmp/flist.sock"

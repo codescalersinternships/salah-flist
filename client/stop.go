@@ -2,29 +2,23 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"log"
 	"net"
 	"os"
 )
 
 var (
-	stopCmd           = flag.NewFlagSet("stop", flag.ExitOnError)
-	stopContainerName = stopCmd.String("container", "", "container name")
+	done = make(chan bool, 1)
 )
 
 func stop(conn net.Conn) {
-	if err := stopCmd.Parse(os.Args[2:]); err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
-
-	flist := new(stopCmd.Name(), "", "", *stopContainerName)
-
+	flist := new(os.Args[1], "", "", os.Args[2], os.Args[3:]...)
 	data, err := json.Marshal(flist)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	writeData(conn, data)
+
+	<-done
 }

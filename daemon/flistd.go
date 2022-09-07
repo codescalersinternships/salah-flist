@@ -18,11 +18,6 @@ const (
 	StopCmd = "stop"
 	RmCmd = "rm"
 	PsCmd = "ps"
-
-	StorePath = "/var/lib/flist/store"
-	ContainersPath = "/var/lib/flist/containers"
-	flistsUnpackedPath = "/var/lib/flist/tmp"
-	defaultStorageHubPath = "zdb://hub.grid.tf:9900"
 )
 
 type Flist struct {
@@ -30,6 +25,7 @@ type Flist struct {
 	MetaURL string			`json:"metaURL"`
 	Entrypoint string		`json:"entrypoint"`
 	ContainerName string	`json:"containerName"`
+	ProcessPid int			`json:"processPid"`
 	Mountpoint string		`json:"mountpoint"`
 }
 
@@ -37,22 +33,25 @@ type Container struct {
 	Id string
 	Path string
 	Status string
+	Pid int
+	fs *g8ufs.G8ufs
 }
 
 type Worker struct {
 	fs *g8ufs.G8ufs
 	Conn net.Conn
 	Flist Flist
-	Containers []Container
+	Containers map[string]Container
 }
 
-func new(containers []Container) *Worker {
+func new(containers map[string]Container) *Worker {
 	return &Worker{ Containers: containers }
 }
 
 func (w *Worker) serve() {
 	if err := json.NewDecoder(w.Conn).Decode(&w.Flist); err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	switch w.Flist.Command {
@@ -79,15 +78,18 @@ func (w *Worker) signalsHandler(sigchnl chan os.Signal) {
 	for sig := range sigchnl {
 		switch sig {
 		default:
-			w.unmountContainer()
+			w.cleanUPContainer()
 		}
 	}
 }
 
-func (w *Worker) unmountContainer() {
-	if err := w.fs.Unmount(); err != nil {
+func (w *Worker) cleanUPContainer() {
+	fs := w.Containers[w.Flist.ContainerName].fs
+	if err := fs.Unmount(); err != nil {
 		log.Println(err)
 	}
+
+	delete(w.Containers, w.Flist.ContainerName)
 }
 
 func main() {
@@ -101,7 +103,7 @@ func main() {
     }
     defer l.Close()
 	
-	containers := make([]Container, 0)
+	containers := make(map[string]Container, 0)
 
 	for {
 		worker := new(containers)
