@@ -7,6 +7,7 @@ import (
 	"strconv"
 )
 
+// writeData writes data on network connection
 func writeData(conn net.Conn, data []byte) {
 	if n, err := conn.Write(data);
 	err != nil || n != len(data) {
@@ -15,6 +16,8 @@ func writeData(conn net.Conn, data []byte) {
 	}
 }
 
+// getDaemonPid gets pid of daemon by communication
+// it on network connection
 func getDaemonPid(conn net.Conn) int {
 	buf := make([]byte, BufSize)
 

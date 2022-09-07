@@ -10,12 +10,12 @@ import (
 	"syscall"
 )
 
-var (
-	DaemonPid = 0
-	
-	BufSize = 1024
-)
-
+// run mounts container and runs entrypoint process inside it. this is
+// client side of run command.  it firstly sends command data to daemon,
+// which does the work of mounting container, then waits for a signal
+// from daemon to know whether the container was mounted successfully or not.
+// if mounted successfully, client execute the entrypoint process isolated
+// inside container.
 func run(conn net.Conn) {
 	flist := new(os.Args[1], os.Args[2], os.Args[3], "", os.Args[4:]...)
 
@@ -55,10 +55,12 @@ func run(conn net.Conn) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	<-done
+	success := <-done
 	
-	if err := cmd.Run(); err != nil {
-		log.Printf("Command %s returned error %v", flist.Entrypoint, err)
+	if success {
+		if err := cmd.Run(); err != nil {
+			log.Printf("Command %s returned error %v", flist.Entrypoint, err)
+		}
 	}
 
 	runtime.UnlockOSThread()

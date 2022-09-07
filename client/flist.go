@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -8,16 +9,43 @@ import (
 	"syscall"
 )
 
+// Unix Domain Socket address
+const SockAddr = "/tmp/flist.sock"
+
+var (
+	// pid of daemon process, clients needs it to send signals to daemon
+	DaemonPid = 0
+	
+	// Default buffers size
+	BufSize = 1024
+)
+
+var (
+	// done is a channel used to synchronize procedures in client and daemon
+	done = make(chan bool, 1)
+)
+
+
+// Flist contains container's data sent in requests
+// from client to daemon
 type Flist struct {
+	// Command can be "run", "stop", "rm", or "ps"
 	Command string			`json:"command"`
+	// MetaURL is URL for meta flist file on the internet
 	MetaURL string			`json:"metaURL"`
+	// Entrypoint is file path for binary to execute as entrypoint in container
 	Entrypoint string		`json:"entrypoint"`
 	Arg []string			`json:"arg"`
+	// name of the container, it's set by "stop" and "rm" commands
+	// to specify which container to stop or remove.
 	ContainerName string	`json:"containerName"`
-	ProcessPid int			`json:"processPid"`
+	// pid of client process, daemon needs it to send signals to clients
+	ClientPid int			`json:"clientPid"`
+	// path of container's mountpoint
 	Mountpoint string		`json:"mountpoint"`
 }
 
+// new creates a new flist object
 func new(command, meta, entrypoint, containerName string, arg ...string) *Flist {
 	return &Flist{
 		Command: command,
@@ -25,11 +53,11 @@ func new(command, meta, entrypoint, containerName string, arg ...string) *Flist 
 		Entrypoint: entrypoint,
 		Arg: arg,
 		ContainerName: containerName,
-		ProcessPid: os.Getpid(),
-		Mountpoint: "",
+		ClientPid: os.Getpid(),
 	}
 }
 
+// Signal init signal handling procedures
 func Signal(sigchnl chan os.Signal) {
 	sigs := []os.Signal {syscall.SIGINT, syscall.SIGUSR1, syscall.SIGUSR2}
 	
@@ -38,6 +66,7 @@ func Signal(sigchnl chan os.Signal) {
 	go signalsHandler(sigchnl)
 }
 
+// signalsHandler helper function to run signals handlers
 func signalsHandler(sigchnl chan os.Signal) {
 	for sig := range sigchnl {
 		switch sig {
@@ -51,21 +80,27 @@ func signalsHandler(sigchnl chan os.Signal) {
 	}
 }
 
+// tellDaemonToCleanupContainer sends SIGUSR1 signal to daemon.
+// daemon should handle it and clean up container
 func tellDaemonToCleanupContainer() {
 	syscall.Kill(DaemonPid, syscall.SIGUSR1)
 
 	os.Exit(1)
 }
 
+// handleSuccessOperation is a SIGUSR1 handler. it sends "true" to done
+// channel. daemon tells clients that command carried successfully by sending
+// SIGUSR1 signal
 func handleSuccessOperation() {
 	done <- true
 }
 
+// handleFailureOperation is a SIGUSR2 handler. it sends "false" to done
+// channel. daemon tells clients that command failed to complete by sending
+// SIGUSR2 signal
 func handleFailureOperation() {
 	done <- false
 }
-
-const SockAddr = "/tmp/flist.sock"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -98,5 +133,5 @@ func main() {
 }
 
 func usage() {
-
+	fmt.Printf("usage: %s COMMAND ARGS...\n", os.Args[0])
 }

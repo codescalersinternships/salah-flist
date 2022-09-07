@@ -7,6 +7,10 @@ import (
 	"os"
 )
 
+// rm removes stopped containers. this is client side of rm command,
+// it firstly sends command data to daemon, which does the work of removing container,
+// then waits for a signal from daemon to know whether the command was
+// carried successfully or not.
 func rm(conn net.Conn) {
 	flist := new(os.Args[1], "", "", os.Args[2], os.Args[3:]...)
 

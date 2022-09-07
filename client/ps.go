@@ -10,7 +10,10 @@ import (
 	"text/tabwriter"
 )
 
-
+// ps lists containers in a tabular format. this is the client side
+// of ps command, at first, clients communicates with daemon to tell
+// about command requested data then waits daemon to send back response.
+// client manipulates data then present it on STDOUT in tabular format.
 func ps(conn net.Conn) {
 	flist := new("ps", "", "", "")
 	

@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+// stop stops running container by sending SIGTERM signal,
+// and after a grace period, SIGKILL to the process inside
+// the container. this is server side of stop command, it
+// carries the work of stopping entrypoint process inside
+// the container. if command carried successfully, it sends SIGUSR1
+// to requesting client, otherwise SIGUSR2 to represent failure.
 func (w *Worker) stop() {
 	if _, ok := w.Containers[w.Flist.ContainerName]; !ok {
 		log.Printf("container name <%s> doesn't exist\n", w.Flist.ContainerName)
@@ -22,6 +28,7 @@ func (w *Worker) stop() {
 	pid := w.Containers[w.Flist.ContainerName].Pid
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		log.Println(err)
+		w.reportFailureOperation()
 		return
 	}
 	time.Sleep(10 * time.Second)
@@ -39,18 +46,4 @@ func (w *Worker) stop() {
 	w.Containers[w.Flist.ContainerName] = container
 
 	w.reportSuccessOperation()
-}
-
-func (w *Worker) reportSuccessOperation() {
-	if err := syscall.Kill(w.Flist.ProcessPid, syscall.SIGUSR1); err != nil {
-		log.Println(err)
-		return
-	}
-}
-
-func (w *Worker) reportFailureOperation() {
-	if err := syscall.Kill(w.Flist.ProcessPid, syscall.SIGUSR2); err != nil {
-		log.Println(err)
-		return
-	}
 }

@@ -150,6 +150,11 @@ func mountFlist(flistPath, fileName, containerDirPath, mountpoint string) (*g8uf
 	return fs, nil
 }
 
+// run mounts container and runs entrypoint process inside it. this is
+// server side of run command, it carries the work of mounting flist,
+// after mount success it sends SIGUSR1 signal to the requesting client
+// to continue executing the entrypoint inside mounted container, otherwise,
+// it sends SIGUSR2 signal to represent failure.
 func (w *Worker) run() {
 	if _, err := w.Conn.Write([]byte(fmt.Sprintf("%d", os.Getpid()))); err != nil {
 		log.Println(err)
@@ -191,6 +196,7 @@ func (w *Worker) run() {
 	w.fs, err = mountFlist(flistPath, fileName, containerDirPath, mountpoint)
 	if err != nil {
 		log.Println(err)
+		w.reportFailureOperation()
 		return
 	}
 
@@ -202,7 +208,7 @@ func (w *Worker) run() {
 		Entrypoint: w.Flist.Entrypoint,
 		Path: containerDirPath,
 		Status: Running,
-		Pid: w.Flist.ProcessPid,
+		Pid: w.Flist.ClientPid,
 		fs: w.fs,
 	}
 	w.Containers[container.Id] = container
