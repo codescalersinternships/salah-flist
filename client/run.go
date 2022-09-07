@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -26,8 +25,6 @@ func run(conn net.Conn) {
 	}
 	writeData(conn, flistData)
 	
-	fmt.Println(flist)
-
 	DaemonPid = getDaemonPid(conn)
 
 	runtime.LockOSThread()
@@ -57,6 +54,7 @@ func run(conn net.Conn) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	<-done
 	
 	if err := cmd.Run(); err != nil {
 		log.Printf("Command %s returned error %v", flist.Entrypoint, err)

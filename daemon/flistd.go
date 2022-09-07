@@ -31,6 +31,8 @@ type Flist struct {
 
 type Container struct {
 	Id string
+	FlistName string
+	Entrypoint string
 	Path string
 	Status string
 	Pid int
@@ -77,16 +79,17 @@ func (w *Worker) Signal(sigchnl chan os.Signal) {
 func (w *Worker) signalsHandler(sigchnl chan os.Signal) {
 	for sig := range sigchnl {
 		switch sig {
-		default:
+		case syscall.SIGUSR1:
 			w.cleanUPContainer()
 		}
 	}
 }
-
 func (w *Worker) cleanUPContainer() {
 	fs := w.Containers[w.Flist.ContainerName].fs
-	if err := fs.Unmount(); err != nil {
-		log.Println(err)
+	if fs != nil {
+		if err := fs.Unmount(); err != nil {
+			log.Println(err)
+		}
 	}
 
 	delete(w.Containers, w.Flist.ContainerName)

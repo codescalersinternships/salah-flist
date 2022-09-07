@@ -31,7 +31,7 @@ func new(command, meta, entrypoint, containerName string, arg ...string) *Flist 
 }
 
 func Signal(sigchnl chan os.Signal) {
-	sigs := []os.Signal {syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGUSR1, syscall.SIGUSR2}
+	sigs := []os.Signal {syscall.SIGINT, syscall.SIGUSR1, syscall.SIGUSR2}
 	
 	signal.Notify(sigchnl, sigs...)
 

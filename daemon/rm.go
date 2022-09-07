@@ -14,10 +14,10 @@ func (w *Worker) rm() {
 
 	container := w.Containers[w.Flist.ContainerName]
 	if container.Status == Stopped {
-		if err := container.fs.Unmount(); err != nil {
-			log.Println(err)
-			w.reportFailureOperation()
-		}
+		container.fs.Unmount();
+
+		delete(w.Containers, w.Flist.ContainerName)
+
 		if err := os.RemoveAll(container.Path); err != nil {
 			log.Println(err)
 			w.reportFailureOperation()

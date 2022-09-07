@@ -204,8 +204,12 @@ func (w *Worker) run() {
 		return
 	}
 
+	w.reportSuccessOperation()
+
 	container := Container {
 		Id: containerId,
+		FlistName: fileName,
+		Entrypoint: w.Flist.Entrypoint,
 		Path: containerDirPath,
 		Status: Running,
 		Pid: w.Flist.ProcessPid,
