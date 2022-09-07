@@ -211,7 +211,6 @@ func (w *Worker) run() {
 		Pid: w.Flist.ProcessPid,
 		fs: w.fs,
 	}
-	fmt.Println(container)
 	w.Containers[container.Id] = container
 
 	sigchnl := make(chan os.Signal)

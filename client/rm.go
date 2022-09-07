@@ -2,24 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"log"
 	"net"
 	"os"
 )
 
-var (
-	rmCmd           = flag.NewFlagSet("stop", flag.ExitOnError)
-	rmContainerName = rmCmd.String("container", "", "container name")
-)
-
 func rm(conn net.Conn) {
-	if err := rmCmd.Parse(os.Args[2:]); err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
-
-	flist := new(rmCmd.Name(), "", "", *rmContainerName)
+	flist := new(os.Args[1], "", "", os.Args[2], os.Args[3:]...)
 
 	data, err := json.Marshal(flist)
 	if err != nil {
@@ -27,4 +16,11 @@ func rm(conn net.Conn) {
 	}
 
 	writeData(conn, data)
+
+	success := <-done
+	if success {
+		log.Printf("container <%s> was removed successfully\n", flist.ContainerName)
+	} else {
+		log.Printf("couldn't remove container <%s>, please check daemon logs\n", flist.ContainerName)
+	}
 }

@@ -62,7 +62,6 @@ func handleSuccessOperation() {
 }
 
 func handleFailureOperation() {
-	log.Println("container name doesn't exist")
 	done <- false
 }
 

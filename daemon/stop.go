@@ -8,13 +8,13 @@ import (
 
 func (w *Worker) stop() {
 	if _, ok := w.Containers[w.Flist.ContainerName]; !ok {
-		log.Printf("container name <%s> doesn't exist", w.Flist.ContainerName)
+		log.Printf("container name <%s> doesn't exist\n", w.Flist.ContainerName)
 		w.reportFailureOperation()
 		return
 	}
 
 	if w.Containers[w.Flist.ContainerName].Status != Running {
-		log.Printf("this container <%s> is not running", w.Flist.ContainerName)
+		log.Printf("this container <%s> is not running\n", w.Flist.ContainerName)
 		w.reportFailureOperation()
 		return
 	}

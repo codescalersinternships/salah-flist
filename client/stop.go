@@ -20,5 +20,10 @@ func stop(conn net.Conn) {
 
 	writeData(conn, data)
 
-	<-done
+	success := <-done
+	if success {
+		log.Printf("container <%s> was stopped successfully\n", flist.ContainerName)
+	} else {
+		log.Printf("couldn't stop container <%s>, please check daemon logs\n", flist.ContainerName)
+	}
 }
