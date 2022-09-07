@@ -32,7 +32,8 @@ func run(conn net.Conn) {
 	cmd := exec.Command(flist.Entrypoint, flist.Arg...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Chroot: flist.Mountpoint,
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS |syscall.CLONE_NEWUSER,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWNET | syscall.CLONE_NEWNS |
+					syscall.CLONE_NEWUSER | syscall.CLONE_NEWPID,
 		Unshareflags: syscall.CLONE_NEWNS,
 		UidMappings: []syscall.SysProcIDMap{{
 			ContainerID: 0,
