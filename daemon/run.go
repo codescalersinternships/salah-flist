@@ -15,16 +15,6 @@ import (
 	"github.com/threefoldtech/0-fs/storage"
 )
 
-var (
-	StorePath = "/var/lib/flist/store"
-	ContainersPath = "/var/lib/flist/containers"
-	flistsUnpackedPath = "/var/lib/flist/tmp"
-	defaultStorageHubPath = "zdb://hub.grid.tf:9900"
-
-	Running = "Running"
-	Stopped = "Stopped"
-)
-
 // buildFileName builds flist's file name from metaURL
 func buildFileName(metaURL string) (string, error) {
 	u, err := url.Parse(metaURL)

@@ -14,10 +14,18 @@ import (
 const (
 	SockAddr = "/tmp/flist.sock"
 
+	StorePath = "/var/lib/flist/store"
+	ContainersPath = "/var/lib/flist/containers"
+	flistsUnpackedPath = "/var/lib/flist/tmp"
+	defaultStorageHubPath = "zdb://hub.grid.tf:9900"
+	
 	RunCmd = "run"
 	StopCmd = "stop"
 	RmCmd = "rm"
 	PsCmd = "ps"
+
+	Running = "RUNNING"
+	Stopped = "STOPPED"
 )
 
 type Flist struct {
