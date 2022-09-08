@@ -65,5 +65,6 @@ func run(conn net.Conn) {
 
 	runtime.UnlockOSThread()
 
-	tellDaemonToCleanupContainer()
+	// tellDaemonToCleanupContainer()
+	conn.Close()
 }

@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
 	"syscall"
 
 	g8ufs "github.com/threefoldtech/0-fs"
@@ -14,6 +13,9 @@ import (
 const (
 	// Unix Domain Socket address
 	SockAddr = "/tmp/flist.sock"
+
+	// Default buffers size
+	BufSize = 1024
 
 	// default paths for downloaded flists, mounted containers, and tmp data
 	StorePath = "/var/lib/flist/store"
@@ -102,39 +104,6 @@ func (w *Worker) serve() {
 	case PsCmd:
 		w.ps()
 	}
-}
-
-// Signal init signal handling procedures
-func (w *Worker) Signal(sigchnl chan os.Signal) {
-	sigs := []os.Signal {syscall.SIGUSR1}
-	
-	signal.Notify(sigchnl, sigs...)
-
-	go w.signalsHandler(sigchnl)
-}
-
-// signalsHandler helper function to run signals handlers
-func (w *Worker) signalsHandler(sigchnl chan os.Signal) {
-	for sig := range sigchnl {
-		switch sig {
-		// clients send SIGUSR1 signals to tell daemon cleanup stopped container
-		case syscall.SIGUSR1:
-			w.cleanUPContainer()
-		}
-	}
-}
-
-// cleanUPContainer helper function used as SIGUSR1 handler
-// to clean up container data on catching SIGUSR1 signals from clients
-func (w *Worker) cleanUPContainer() {
-	fs := w.Containers[w.Flist.ContainerName].fs
-	if fs != nil {
-		if err := fs.Unmount(); err != nil {
-			log.Println(err)
-		}
-	}
-
-	delete(w.Containers, w.Flist.ContainerName)
 }
 
 // reportSuccessOperation sends SIGUSR1 signal to client to tell client that

@@ -58,16 +58,16 @@ func new(command, meta, entrypoint, containerName string, arg ...string) *Flist 
 }
 
 // Signal init signal handling procedures
-func Signal(sigchnl chan os.Signal) {
+func Signal(sigchnl chan os.Signal, conn net.Conn) {
 	sigs := []os.Signal {syscall.SIGINT, syscall.SIGUSR1, syscall.SIGUSR2}
 	
 	signal.Notify(sigchnl, sigs...)
 
-	go signalsHandler(sigchnl)
+	go signalsHandler(sigchnl, conn)
 }
 
 // signalsHandler helper function to run signals handlers
-func signalsHandler(sigchnl chan os.Signal) {
+func signalsHandler(sigchnl chan os.Signal, conn net.Conn) {
 	for sig := range sigchnl {
 		switch sig {
 		case syscall.SIGUSR1:
@@ -75,15 +75,18 @@ func signalsHandler(sigchnl chan os.Signal) {
 		case syscall.SIGUSR2:
 			handleFailureOperation()
 		case syscall.SIGINT:
-			tellDaemonToCleanupContainer()
+			tellDaemonToCleanupContainer(conn)
 		}
 	}
 }
 
-// tellDaemonToCleanupContainer sends SIGUSR1 signal to daemon.
-// daemon should handle it and clean up container
-func tellDaemonToCleanupContainer() {
-	syscall.Kill(DaemonPid, syscall.SIGUSR1)
+// tellDaemonToCleanupContainer closes connection with daemon.
+// when connection close, daemon know that client exited and clean up container.
+func tellDaemonToCleanupContainer(conn net.Conn) {
+	if err := conn.Close(); err != nil {
+		log.Println(err)
+		return
+	}
 
 	os.Exit(1)
 }
@@ -108,10 +111,11 @@ func main() {
         os.Exit(1)
     }
 
-	sigchnl := make(chan os.Signal)
-	Signal(sigchnl)
-
 	conn, err := net.Dial("unix", SockAddr)
+
+	sigchnl := make(chan os.Signal)
+	Signal(sigchnl, conn)
+
 	if err != nil {
 		log.Fatal(err)
 	}

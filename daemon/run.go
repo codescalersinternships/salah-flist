@@ -213,13 +213,12 @@ func (w *Worker) run() {
 	}
 	w.Containers[container.Id] = container
 
-	sigchnl := make(chan os.Signal)
-	w.Signal(sigchnl)
+	buf := make([]byte, BufSize)
+	// block on reading from connection until connection closed by client
+	w.Conn.Read(buf)
+	// then clean up container
+	w.fs.Unmount()
+	delete(w.Containers, w.Flist.ContainerName)
 	
-	err = w.fs.Wait();
-	if err != nil {
-		log.Println(err)
-		return
-	}
 	log.Printf("Container at %v unmounted successfully", containerDirPath)
 }

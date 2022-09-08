@@ -39,6 +39,8 @@ func (w *Worker) stop() {
 	container := Container {
 		Status: Stopped,
 		Id: w.Containers[w.Flist.ContainerName].Id,
+		FlistName: w.Containers[w.Flist.ContainerName].FlistName,
+		Entrypoint: w.Containers[w.Flist.ContainerName].Entrypoint,
 		Path: w.Containers[w.Flist.ContainerName].Path,
 		Pid: w.Containers[w.Flist.ContainerName].Pid,
 		fs: w.Containers[w.Flist.ContainerName].fs,
