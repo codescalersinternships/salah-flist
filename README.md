@@ -2,7 +2,11 @@
 
 The flist file format is a general purpose format to store metadata about a (posix) filesystem. It's main goal is keeping a small file with enough information to make a complete filesystem available without the data payload itself, in an efficient way.
 
-Flist is an app that provides the ability to run an application in a loosely isolated environment called a container.
+`Flist` is an app that provides the ability to run an application in a loosely isolated environment called a container.
+
+## Design
+
+Flist uses a client-server architecture. The Flist client talks to the Flist daemon, which does the heavy lifting of building, running, and handling your Flist containers. The Docker client and daemon communicate over UNIX sockets.
 
 ## How to use flist?
 
