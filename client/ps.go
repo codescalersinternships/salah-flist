@@ -10,19 +10,20 @@ import (
 	"text/tabwriter"
 )
 
-// ps lists containers in a tabular format. this is the client side
-// of ps command, at first, clients communicates with daemon to tell
-// about command requested data then waits daemon to send back response.
-// client manipulates data then present it on STDOUT in tabular format.
-func ps(conn net.Conn) {
-	flist := new("ps", "", "", "")
-	
-	data, err := json.Marshal(flist)
-	if err != nil {
-		log.Fatal(err)
-	}
+type Records struct {
+	Records string
+}
 
-	writeData(conn, data)
+// ps lists containers in a tabular format. this is the client side
+// of ps command, at first client sends a request message, then waits daemon to send back response.
+// client manipulates data in response body then present it on STDOUT in tabular format.
+func ps(conn net.Conn) {
+	request := newRequest(os.Args[1], os.Args[2:]...)
+
+	if err := ConnectionWrite(conn, request); err != nil {
+		log.Println(err)
+		return
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 3, 3, 3, ' ', 0)
 	
@@ -31,20 +32,20 @@ func ps(conn net.Conn) {
 		return
 	}
 
-	buf := make([]byte, BufSize)
-	var d string
-	for {
-		n, err := conn.Read(buf[:])
-		if err != nil {
-			break
-		}
-		
-		d = fmt.Sprintf("%s%s", d, buf[:n])
+	var response Response
+	if err := ConnectionRead(conn, &response); err != nil {
+		log.Println(err)
+		return
 	}
-	records := strings.Split(d, ",")
 
-	success := <-done
-	if success {
+	if response.Status == Success {
+		var recordsData Records
+		if err := json.Unmarshal(response.Body, &recordsData); err != nil {
+			log.Println(err)
+			return
+		}
+		records := strings.Split(recordsData.Records, ",")
+		
 		for _, record := range records {
 			_, err := fmt.Fprintln(w, record)
 			if err != nil {
@@ -52,6 +53,10 @@ func ps(conn net.Conn) {
 				return
 			}
 		}
+	} else {
+		log.Println(response.ErrorMsg)
+		return
 	}
+	
 	w.Flush()
 }

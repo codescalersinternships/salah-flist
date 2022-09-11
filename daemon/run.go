@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -152,73 +153,122 @@ func mountFlist(flistPath, fileName, containerDirPath, mountpoint string) (*g8uf
 
 // run mounts container and runs entrypoint process inside it. this is
 // server side of run command, it carries the work of mounting flist,
-// after mount success it sends SIGUSR1 signal to the requesting client
-// to continue executing the entrypoint inside mounted container, otherwise,
-// it sends SIGUSR2 signal to represent failure.
+// after mount success it sends Response message with Success Status, otherwise,
+// it sends Response message with Error status to represent failure.
 func (w *Worker) run() {
-	if _, err := w.Conn.Write([]byte(fmt.Sprintf("%d", os.Getpid()))); err != nil {
+	fileName, err := buildFileName(w.Container.MetaURL)
+	if err != nil {
 		log.Println(err)
+		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
-	fileName, err := buildFileName(w.Flist.MetaURL)
+	flistPath, err := getFlist(w.Container.MetaURL, fileName)
 	if err != nil {
 		log.Println(err)
-		return
-	}
-
-	flistPath, err := getFlist(w.Flist.MetaURL, fileName)
-	if err != nil {
-		log.Println(err)
+		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
 	if err := os.MkdirAll(ContainersPath, 0770); err != nil {
 		log.Println(err)
+		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
 	containerDirPath, err := os.MkdirTemp(ContainersPath, fileName)
 	if err != nil {
 		log.Println(err)
+		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 	s := strings.Split(containerDirPath, "/")
 	containerId := s[len(s)-1]
-	w.Flist.ContainerName = containerId
 
 	mountpoint := fmt.Sprintf("%s/%s", containerDirPath, "mnt")
 	if err = os.MkdirAll(mountpoint, 0770); err != nil {
 		log.Println(err)
+		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 
-	w.fs, err = mountFlist(flistPath, fileName, containerDirPath, mountpoint)
+	fs, err := mountFlist(flistPath, fileName, containerDirPath, mountpoint)
 	if err != nil {
 		log.Println(err)
-		w.reportFailureOperation()
+		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+			log.Println(err)
+			return
+		}		
 		return
 	}
 
-	w.reportSuccessOperation()
-
-	container := Container {
-		Id: containerId,
-		FlistName: fileName,
-		Entrypoint: w.Flist.Entrypoint,
-		Path: containerDirPath,
+	container := Container{
 		Status: Running,
-		Pid: w.Flist.ClientPid,
-		fs: w.fs,
+		Id: containerId,
+		MetaURL: w.Container.MetaURL,
+		FlistName: fileName,
+		Entrypoint: w.Container.Entrypoint,
+		Args: w.Container.Args,
+		Path: containerDirPath,
+		Pid: w.Container.Pid,
+		fs: fs,
 	}
+	w.Container = container
 	w.Containers[container.Id] = container
 
-	buf := make([]byte, BufSize)
-	// block on reading from connection until connection closed by client
-	w.Conn.Read(buf)
-	// then clean up container
-	w.fs.Unmount()
-	delete(w.Containers, w.Flist.ContainerName)
-	
-	log.Printf("Container at %v unmounted successfully", containerDirPath)
+	defer log.Printf("Container at %v unmounted successfully", containerDirPath)
+	defer w.Container.fs.Unmount()
+	// defer delete(w.Containers, w.Container.Id)
+
+	response := Response {
+		Status: Success,
+		Body: json.RawMessage([]byte(fmt.Sprintf("{\"mountpoint\": %q}", mountpoint))),
+	}
+	if err := ConnectionWrite(w.Conn, response); err != nil {
+		log.Println(err)
+		return
+	}
+
+	if err := ConnectionRead(w.Conn, &response); err != nil {
+		log.Println(err)
+		w.Containers[container.Id] = Container{
+			Status: Stopped,
+			Id: containerId,
+			MetaURL: w.Container.MetaURL,
+			FlistName: fileName,
+			Entrypoint: w.Container.Entrypoint,
+			Args: w.Container.Args,
+			Path: containerDirPath,
+			Pid: w.Container.Pid,
+			fs: fs,
+		}
+		return
+	}
+
+	w.Containers[container.Id] = Container{
+		Status: Stopped,
+		Id: containerId,
+		MetaURL: w.Container.MetaURL,
+		FlistName: fileName,
+		Entrypoint: w.Container.Entrypoint,
+		Args: w.Container.Args,
+		Path: containerDirPath,
+		Pid: w.Container.Pid,
+		fs: fs,
+	}
 }

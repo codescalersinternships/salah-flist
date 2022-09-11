@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"syscall"
 	"time"
@@ -10,25 +11,37 @@ import (
 // and after a grace period, SIGKILL to the process inside
 // the container. this is server side of stop command, it
 // carries the work of stopping entrypoint process inside
-// the container. if command carried successfully, it sends SIGUSR1
-// to requesting client, otherwise SIGUSR2 to represent failure.
+// the container.
 func (w *Worker) stop() {
-	if _, ok := w.Containers[w.Flist.ContainerName]; !ok {
-		log.Printf("container name <%s> doesn't exist\n", w.Flist.ContainerName)
-		w.reportFailureOperation()
+	if _, ok := w.Containers[w.Container.Id]; !ok {
+		log.Printf("container <%s> doesn't exist\n", w.Container.Id)
+		msg := fmt.Sprintf("container <%s> doesn't exist\n", w.Container.Id)
+		if err := ConnectionErrorResponse(w.Conn, msg); err != nil {
+			log.Println(err)
+			return
+		}
+
 		return
 	}
 
-	if w.Containers[w.Flist.ContainerName].Status != Running {
-		log.Printf("this container <%s> is not running\n", w.Flist.ContainerName)
-		w.reportFailureOperation()
+	if w.Containers[w.Container.Id].Status != Running {
+		log.Printf("this container <%s> is not running\n", w.Container.Id)
+		msg := fmt.Sprintf("this container <%s> is not running\n", w.Container.Id)
+		if err := ConnectionErrorResponse(w.Conn, msg); err != nil {
+			log.Println(err)
+			return
+		}
+
 		return
 	}
 
-	pid := w.Containers[w.Flist.ContainerName].Pid
+	pid := w.Containers[w.Container.Id].Pid
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		log.Println(err)
-		w.reportFailureOperation()
+		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+			log.Println(err)
+			return
+		}
 		return
 	}
 	time.Sleep(10 * time.Second)
@@ -38,14 +51,20 @@ func (w *Worker) stop() {
 
 	container := Container {
 		Status: Stopped,
-		Id: w.Containers[w.Flist.ContainerName].Id,
-		FlistName: w.Containers[w.Flist.ContainerName].FlistName,
-		Entrypoint: w.Containers[w.Flist.ContainerName].Entrypoint,
-		Path: w.Containers[w.Flist.ContainerName].Path,
-		Pid: w.Containers[w.Flist.ContainerName].Pid,
-		fs: w.Containers[w.Flist.ContainerName].fs,
+		Id: w.Containers[w.Container.Id].Id,
+		FlistName: w.Containers[w.Container.Id].FlistName,
+		Entrypoint: w.Containers[w.Container.Id].Entrypoint,
+		Path: w.Containers[w.Container.Id].Path,
+		Pid: w.Containers[w.Container.Id].Pid,
+		fs: w.Containers[w.Container.Id].fs,
 	}
-	w.Containers[w.Flist.ContainerName] = container
+	w.Containers[w.Container.Id] = container
 
-	w.reportSuccessOperation()
+	response := Response {
+		Status: Success,
+	}
+	if err := ConnectionWrite(w.Conn, response); err != nil {
+		log.Println(err)
+		return
+	}
 }

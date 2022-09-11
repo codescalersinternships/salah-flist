@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -9,20 +10,18 @@ import (
 	"syscall"
 )
 
-// Unix Domain Socket address
-const SockAddr = "/tmp/flist.sock"
+const (
+	// Unix Domain Socket address
+	SockAddr		= "/tmp/flist.sock"
 
-var (
-	// pid of daemon process, clients needs it to send signals to daemon
-	DaemonPid = 0
-	
-	// Default buffers size
-	BufSize = 1024
+	// "Success", "Error" are possible response statuses
+	Success Status  = "success"
+	Error 	Status  = "error"
 )
 
-var (
-	// done is a channel used to synchronize procedures in client and daemon
-	done = make(chan bool, 1)
+var (	
+	// Default buffers size
+	BufSize = 1024
 )
 
 
@@ -45,21 +44,37 @@ type Flist struct {
 	Mountpoint string		`json:"mountpoint"`
 }
 
-// new creates a new flist object
-func new(command, meta, entrypoint, containerName string, arg ...string) *Flist {
-	return &Flist{
+type Request struct {
+	// Command can be "run", "stop", "rm", or "ps"
+	Command string			`json:"command"`
+	// Args are arguments for Command, if any
+	Args []string			`json:"args"`
+	// Body holds data of request, if any
+	Body json.RawMessage	`json:"body"`
+}
+
+// Status of Response messages
+type Status string
+type Response struct {
+	// Response Status can be "Success" or "Error"
+	Status Status			`json:"status"`
+	// ErrorMsg holds error message string, if any
+	ErrorMsg string 		`json:"errorMsg"`
+	// Body holds data of response, if any
+	Body json.RawMessage	`json:"body"`
+}
+
+// newRequest creates a new Request object
+func newRequest(command string, args...string) *Request {
+	return &Request{
 		Command: command,
-		MetaURL: meta,
-		Entrypoint: entrypoint,
-		Arg: arg,
-		ContainerName: containerName,
-		ClientPid: os.Getpid(),
+		Args: args,
 	}
 }
 
 // Signal init signal handling procedures
 func Signal(sigchnl chan os.Signal, conn net.Conn) {
-	sigs := []os.Signal {syscall.SIGINT, syscall.SIGUSR1, syscall.SIGUSR2}
+	sigs := []os.Signal {syscall.SIGINT}
 	
 	signal.Notify(sigchnl, sigs...)
 
@@ -70,10 +85,6 @@ func Signal(sigchnl chan os.Signal, conn net.Conn) {
 func signalsHandler(sigchnl chan os.Signal, conn net.Conn) {
 	for sig := range sigchnl {
 		switch sig {
-		case syscall.SIGUSR1:
-			handleSuccessOperation()
-		case syscall.SIGUSR2:
-			handleFailureOperation()
 		case syscall.SIGINT:
 			tellDaemonToCleanupContainer(conn)
 		}
@@ -91,20 +102,6 @@ func tellDaemonToCleanupContainer(conn net.Conn) {
 	os.Exit(1)
 }
 
-// handleSuccessOperation is a SIGUSR1 handler. it sends "true" to done
-// channel. daemon tells clients that command carried successfully by sending
-// SIGUSR1 signal
-func handleSuccessOperation() {
-	done <- true
-}
-
-// handleFailureOperation is a SIGUSR2 handler. it sends "false" to done
-// channel. daemon tells clients that command failed to complete by sending
-// SIGUSR2 signal
-func handleFailureOperation() {
-	done <- false
-}
-
 func main() {
 	if len(os.Args) < 2 {
         usage()
@@ -112,14 +109,13 @@ func main() {
     }
 
 	conn, err := net.Dial("unix", SockAddr)
-
-	sigchnl := make(chan os.Signal)
-	Signal(sigchnl, conn)
-
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
+
+	sigchnl := make(chan os.Signal)
+	Signal(sigchnl, conn)
 
 	switch os.Args[1] {
 	case "run":

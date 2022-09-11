@@ -1,30 +1,37 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net"
 	"os"
 )
 
 // rm removes stopped containers. this is client side of rm command,
-// it firstly sends command data to daemon, which does the work of removing container,
-// then waits for a signal from daemon to know whether the command was
-// carried successfully or not.
+// it firstly sends command data to daemon in request message,
+// which does the work of removing container, then waits for a response
+// from daemon to know whether the command was carried successfully or not.
 func rm(conn net.Conn) {
-	flist := new(os.Args[1], "", "", os.Args[2], os.Args[3:]...)
+	request := newRequest(os.Args[1], os.Args[2:]...)
 
-	data, err := json.Marshal(flist)
-	if err != nil {
-		log.Fatal(err)
+	if err := ConnectionWrite(conn, request); err != nil {
+		log.Println(err)
+		return
 	}
 
-	writeData(conn, data)
+	var response Response
+	if err := ConnectionRead(conn, &response); err != nil {
+		log.Println(err)
+		if err := ConnectionErrorResponse(conn, err.Error()); err != nil {
+			log.Println(err)
+			return
+		}
+		return
+	}
 
-	success := <-done
-	if success {
-		log.Printf("container <%s> was removed successfully\n", flist.ContainerName)
+	if response.Status == Error {
+		log.Printf("couldn't remove container <%s>, please check daemon logs\n", os.Args[2])
+		return
 	} else {
-		log.Printf("couldn't remove container <%s>, please check daemon logs\n", flist.ContainerName)
+		log.Printf("container <%s> was removed successfully\n", os.Args[2])
 	}
 }
