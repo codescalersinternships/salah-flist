@@ -11,30 +11,30 @@ import (
 
 const (
 	// Unix Domain Socket address
-	SockAddr = "/tmp/flist.sock"
+	SockAddr 				= "/tmp/flist.sock"
 
 	// Default buffers size
-	BufSize = 1024
+	BufSize 				= 1024
 
 	// default paths for downloaded flists, mounted containers, and tmp data
-	StorePath = "/var/lib/flist/store"
-	ContainersPath = "/var/lib/flist/containers"
-	flistsUnpackedPath = "/var/lib/flist/tmp"
-	defaultStorageHubPath = "zdb://hub.grid.tf:9900"
+	StorePath 				= "/var/lib/flist/store"
+	ContainersPath			= "/var/lib/flist/containers"
+	flistsUnpackedPath 		= "/var/lib/flist/tmp"
+	defaultStorageHubPath   = "zdb://hub.grid.tf:9900"
 	
 	// RunCmd, StopCmd, RmCmd, PsCmd are flist sub-commands
-	RunCmd = "run"
-	StopCmd = "stop"
-	RmCmd = "rm"
-	PsCmd = "ps"
+	RunCmd 					= "run"
+	StopCmd 				= "stop"
+	RmCmd 					= "rm"
+	PsCmd 					= "ps"
 
 	// Running, Stopped are available container states
-	Running = "RUNNING"
-	Stopped = "STOPPED"
+	Running 				= "RUNNING"
+	Stopped 				= "STOPPED"
 
 	// "Success", "Error" are possible response statuses
-	Success Status = "success"
-	Error 	Status = "error"
+	Success Status 			= "success"
+	Error 	Status 			= "error"
 )
 
 // Container contains data about created container

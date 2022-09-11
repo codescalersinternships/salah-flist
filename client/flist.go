@@ -21,7 +21,7 @@ const (
 
 var (	
 	// Default buffers size
-	BufSize = 1024
+	BufSize 		= 1024
 )
 
 
