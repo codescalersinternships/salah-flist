@@ -59,25 +59,31 @@ func run(conn net.Conn) {
 
 	cmd := exec.Command(os.Args[3], os.Args[4:]...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Chroot: mountData.Mountpoint,
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWNET | syscall.CLONE_NEWNS |
-					syscall.CLONE_NEWUSER | syscall.CLONE_NEWPID,
-		Unshareflags: syscall.CLONE_NEWNS,
-		UidMappings: []syscall.SysProcIDMap{{
-			ContainerID: 0,
-			HostID: syscall.Getuid(),
-			Size: 1,
+		Chroot: 		mountData.Mountpoint,
+
+		Cloneflags: 	syscall.CLONE_NEWUTS | syscall.CLONE_NEWNET | syscall.CLONE_NEWNS |
+						syscall.CLONE_NEWUSER | syscall.CLONE_NEWPID,
+
+		Unshareflags: 	syscall.CLONE_NEWNS,
+
+		UidMappings: 	[]syscall.SysProcIDMap{{
+			ContainerID: 	0,
+			HostID: 		syscall.Getuid(),
+			Size: 			1,
 		}},
-		GidMappings: []syscall.SysProcIDMap{{
-			ContainerID: 0,
-			HostID: syscall.Getgid(),
-			Size: 1,
+
+		GidMappings: 	[]syscall.SysProcIDMap{{
+			ContainerID: 	0,
+			HostID: 		syscall.Getgid(),
+			Size: 			1,
 		}},
-		Credential: &syscall.Credential{
-			Uid: uint32(syscall.Getuid()),
-			Gid: uint32(syscall.Getuid()),
+
+		Credential: 	&syscall.Credential{
+			Uid: 			uint32(syscall.Getuid()),
+			Gid: 			uint32(syscall.Getuid()),
 		},
-		Pdeathsig: syscall.SIGKILL,
+
+		Pdeathsig: 		syscall.SIGKILL,
 	}
 	cmd.Stdin  = os.Stdin
 	cmd.Stdout = os.Stdout

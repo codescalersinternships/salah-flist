@@ -119,10 +119,10 @@ func (w *Worker) serve() {
 			}
 			return
 		}
-		container.MetaURL = request.Args[0]
-		container.Entrypoint = request.Args[1]
-		container.Args = request.Args[2:]
-		w.Container = container
+		container.MetaURL 		= request.Args[0]
+		container.Entrypoint 	= request.Args[1]
+		container.Args 			= request.Args[2:]
+		w.Container 			= container
 
 		w.run()
 	case StopCmd:

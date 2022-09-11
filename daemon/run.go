@@ -218,15 +218,15 @@ func (w *Worker) run() {
 	}
 
 	container := Container{
-		Status: Running,
-		Id: containerId,
-		MetaURL: w.Container.MetaURL,
-		FlistName: fileName,
+		Status: 	Running,
+		Id: 		containerId,
+		MetaURL: 	w.Container.MetaURL,
+		FlistName:  fileName,
 		Entrypoint: w.Container.Entrypoint,
-		Args: w.Container.Args,
-		Path: containerDirPath,
-		Pid: w.Container.Pid,
-		fs: fs,
+		Args: 		w.Container.Args,
+		Path: 		containerDirPath,
+		Pid:		w.Container.Pid,
+		fs: 		fs,
 	}
 	w.Container = container
 	w.Containers[container.Id] = container
@@ -237,7 +237,7 @@ func (w *Worker) run() {
 
 	response := Response {
 		Status: Success,
-		Body: json.RawMessage([]byte(fmt.Sprintf("{\"mountpoint\": %q}", mountpoint))),
+		Body: 	json.RawMessage([]byte(fmt.Sprintf("{\"mountpoint\": %q}", mountpoint))),
 	}
 	if err := ConnectionWrite(w.Conn, response); err != nil {
 		log.Println(err)
@@ -247,28 +247,28 @@ func (w *Worker) run() {
 	if err := ConnectionRead(w.Conn, &response); err != nil {
 		log.Println(err)
 		w.Containers[container.Id] = Container{
-			Status: Stopped,
-			Id: containerId,
-			MetaURL: w.Container.MetaURL,
-			FlistName: fileName,
+			Status: 	Stopped,
+			Id: 		containerId,
+			MetaURL: 	w.Container.MetaURL,
+			FlistName: 	fileName,
 			Entrypoint: w.Container.Entrypoint,
-			Args: w.Container.Args,
-			Path: containerDirPath,
-			Pid: w.Container.Pid,
-			fs: fs,
+			Args: 		w.Container.Args,
+			Path: 		containerDirPath,
+			Pid: 		w.Container.Pid,
+			fs: 		fs,
 		}
 		return
 	}
 
 	w.Containers[container.Id] = Container{
-		Status: Stopped,
-		Id: containerId,
-		MetaURL: w.Container.MetaURL,
-		FlistName: fileName,
+		Status: 	Stopped,
+		Id: 		containerId,
+		MetaURL: 	w.Container.MetaURL,
+		FlistName: 	fileName,
 		Entrypoint: w.Container.Entrypoint,
-		Args: w.Container.Args,
-		Path: containerDirPath,
-		Pid: w.Container.Pid,
-		fs: fs,
+		Args: 		w.Container.Args,
+		Path: 		containerDirPath,
+		Pid: 		w.Container.Pid,
+		fs: 		fs,
 	}
 }

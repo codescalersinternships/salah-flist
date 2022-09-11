@@ -30,8 +30,8 @@ func ConnectionRead(conn net.Conn, buf any) error {
 // and sets ErrorMsg field to msg argument
 func ConnectionErrorResponse(conn net.Conn, msg string) error {
 	err := ConnectionWrite(conn, Response {
-		Status: Error,
-		ErrorMsg: msg,
+		Status: 	Error,
+		ErrorMsg: 	msg,
 	})
 	if err != nil {
 		return err

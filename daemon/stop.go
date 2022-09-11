@@ -50,13 +50,13 @@ func (w *Worker) stop() {
 	}
 
 	container := Container {
-		Status: Stopped,
-		Id: w.Containers[w.Container.Id].Id,
-		FlistName: w.Containers[w.Container.Id].FlistName,
+		Status: 	Stopped,
+		Id: 		w.Containers[w.Container.Id].Id,
+		FlistName: 	w.Containers[w.Container.Id].FlistName,
 		Entrypoint: w.Containers[w.Container.Id].Entrypoint,
-		Path: w.Containers[w.Container.Id].Path,
-		Pid: w.Containers[w.Container.Id].Pid,
-		fs: w.Containers[w.Container.Id].fs,
+		Path: 		w.Containers[w.Container.Id].Path,
+		Pid: 		w.Containers[w.Container.Id].Pid,
+		fs: 		w.Containers[w.Container.Id].fs,
 	}
 	w.Containers[w.Container.Id] = container
 

@@ -19,7 +19,7 @@ func (w *Worker) ps() {
 	
 	response := Response {
 		Status: Success,
-		Body: json.RawMessage([]byte(fmt.Sprintf("{\"records\": %q}", records))),
+		Body: 	json.RawMessage([]byte(fmt.Sprintf("{\"records\": %q}", records))),
 	}
 	if err := ConnectionWrite(w.Conn, response); err != nil {
 		log.Println(err)
