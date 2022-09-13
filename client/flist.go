@@ -24,26 +24,6 @@ var (
 	BufSize 		= 1024
 )
 
-
-// Flist contains container's data sent in requests
-// from client to daemon
-type Flist struct {
-	// Command can be "run", "stop", "rm", or "ps"
-	Command string			`json:"command"`
-	// MetaURL is URL for meta flist file on the internet
-	MetaURL string			`json:"metaURL"`
-	// Entrypoint is file path for binary to execute as entrypoint in container
-	Entrypoint string		`json:"entrypoint"`
-	Arg []string			`json:"arg"`
-	// name of the container, it's set by "stop" and "rm" commands
-	// to specify which container to stop or remove.
-	ContainerName string	`json:"containerName"`
-	// pid of client process, daemon needs it to send signals to clients
-	ClientPid int			`json:"clientPid"`
-	// path of container's mountpoint
-	Mountpoint string		`json:"mountpoint"`
-}
-
 type Request struct {
 	// Command can be "run", "stop", "rm", or "ps"
 	Command string			`json:"command"`
@@ -64,12 +44,26 @@ type Response struct {
 	Body json.RawMessage	`json:"body"`
 }
 
+// Connection structure
+type Connection struct {
+	// Conn is network connection between client and daemon thread
+	Conn net.Conn
+}
+
 // newRequest creates a new Request object
-func newRequest(command string, args...string) *Request {
-	return &Request{
+func newRequest(body ClientData, command string, args...string) (*Request, error) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	request := &Request{
 		Command: command,
 		Args: args,
+		Body: json.RawMessage(data),
 	}
+
+	return request, nil
 }
 
 // Signal init signal handling procedures

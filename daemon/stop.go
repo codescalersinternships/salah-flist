@@ -12,11 +12,14 @@ import (
 // the container. this is server side of stop command, it
 // carries the work of stopping entrypoint process inside
 // the container.
-func (w *Worker) stop() {
-	if _, ok := w.Containers[w.Container.Id]; !ok {
-		log.Printf("container <%s> doesn't exist\n", w.Container.Id)
-		msg := fmt.Sprintf("container <%s> doesn't exist\n", w.Container.Id)
-		if err := ConnectionErrorResponse(w.Conn, msg); err != nil {
+func (s *Server) stop(conn Connection, request Request) {
+	containerID := request.Args[0]
+
+	containerToStop, ok := s.Containers[containerID]
+	if !ok {
+		log.Printf("container <%s> doesn't exist\n", containerID)
+		msg := fmt.Sprintf("container <%s> doesn't exist\n", containerID)
+		if err := conn.SendErrorResponse(msg); err != nil {
 			log.Println(err)
 			return
 		}
@@ -24,10 +27,10 @@ func (w *Worker) stop() {
 		return
 	}
 
-	if w.Containers[w.Container.Id].Status != Running {
-		log.Printf("this container <%s> is not running\n", w.Container.Id)
-		msg := fmt.Sprintf("this container <%s> is not running\n", w.Container.Id)
-		if err := ConnectionErrorResponse(w.Conn, msg); err != nil {
+	if containerToStop.Status != Running {
+		log.Printf("this container <%s> is not running\n", containerID)
+		msg := fmt.Sprintf("this container <%s> is not running\n", containerID)
+		if err := conn.SendErrorResponse(msg); err != nil {
 			log.Println(err)
 			return
 		}
@@ -35,10 +38,10 @@ func (w *Worker) stop() {
 		return
 	}
 
-	pid := w.Containers[w.Container.Id].Pid
+	pid := containerToStop.Pid
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		log.Println(err)
-		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+		if err := conn.SendErrorResponse(err.Error()); err != nil {
 			log.Println(err)
 			return
 		}
@@ -49,21 +52,13 @@ func (w *Worker) stop() {
 		log.Println(err)
 	}
 
-	container := Container {
-		Status: 	Stopped,
-		Id: 		w.Containers[w.Container.Id].Id,
-		FlistName: 	w.Containers[w.Container.Id].FlistName,
-		Entrypoint: w.Containers[w.Container.Id].Entrypoint,
-		Path: 		w.Containers[w.Container.Id].Path,
-		Pid: 		w.Containers[w.Container.Id].Pid,
-		fs: 		w.Containers[w.Container.Id].fs,
-	}
-	w.Containers[w.Container.Id] = container
+	containerToStop.Status = Stopped
+	s.Containers[containerID] = containerToStop
 
 	response := Response {
 		Status: Success,
 	}
-	if err := ConnectionWrite(w.Conn, response); err != nil {
+	if err := conn.SendResponse(response); err != nil {
 		log.Println(err)
 		return
 	}

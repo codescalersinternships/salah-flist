@@ -40,33 +40,34 @@ const (
 // Container contains data about created container
 type Container struct {
 	// Id is container's unique ID, it's same as ContainerName
-	Id string
+	Id string				`json:"id"`
 	// MetaURL is URL for meta flist file on the internet
-	MetaURL string
+	MetaURL string			`json:"metaUrl"`
 	// name of downloaded flist meta file used to mount container
-	FlistName string
+	FlistName string		`json:"flistName"`
 	// Entrypoint is file path for binary to execute as entrypoint in container
-	Entrypoint string
+	Entrypoint string		`json:"entrypoint"`
 	// Args are arguments of Entrypoint command
-	Args []string
+	Args []string			`json:"args"`
 	// Path is location path of container directory
-	Path string
+	Path string				`json:"path"`
 	// Status is current status of container, it can be "RUNNING" or "STOPPED"
-	Status string
-
+	Status string			`json:"status"`
 	// pid of entrypoint process running in container
-	Pid int
-
+	Pid int					`json:"pid"`
+	// Mountpoint is path of mounted container's filesystem
+	Mountpoint string		`json:"mountpoint"`
 	// filesystem object of mounted container
-	fs *g8ufs.G8ufs
+	Fs *g8ufs.G8ufs			`json:"fs"`
 }
 
-// Worker represents a thread that handles commands from clients
-type Worker struct {
+type Connection struct {
 	// Conn is network connection between client and daemon thread
 	Conn net.Conn
-	// Container is the container that worker is responsible for
-	Container Container
+}
+
+type Server struct {
+	Listener net.Listener
 	// all mounted "RUNNING", "STOPPED" containers
 	Containers map[string]Container
 }
@@ -82,6 +83,7 @@ type Request struct {
 
 // Status of Response messages
 type Status string
+
 type Response struct {
 	// Response Status can be "Success" or "Error"
 	Status Status			`json:"status"`
@@ -91,73 +93,69 @@ type Response struct {
 	Body json.RawMessage	`json:"body"`
 }
 
-// new creates a new Worker object
-func newWorker(conn net.Conn, containers map[string]Container) *Worker {
-	return &Worker {
-		Conn: conn,
-		Containers: containers,
+// newServer Creates a new Server object
+func newServer() (*Server, error) {
+	l, err := net.Listen("unix", SockAddr)
+    if err != nil {
+		return nil, err
+    }
+
+	server := Server {
+		Listener: l,
+		Containers: make(map[string]Container, 0),
 	}
+
+	return &server, nil
+}
+
+// Accept is a Server method waits for and returns the next connection
+func (server *Server) Accept() (*Connection, error) {
+	conn, err := server.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Connection{Conn: conn}, nil
 }
 
 // serve serves the command requested by clients by running one of
 // the command "run", "stop", "rm", "ps"
-func (w *Worker) serve() {
+func (s *Server) serve(conn Connection) {
 	var request Request
-	if err := ConnectionRead(w.Conn, &request); err != nil {
+	if err := conn.ReadRequest(&request); err != nil {
 		log.Println(err)
 		return
 	}
 
 	switch request.Command {
 	case RunCmd:
-		var container Container
-		if err := json.Unmarshal(request.Body, &container); err != nil {
-			log.Println(err)
-			if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
-				log.Println(err)
-				return
-			}
-			return
-		}
-		container.MetaURL 		= request.Args[0]
-		container.Entrypoint 	= request.Args[1]
-		container.Args 			= request.Args[2:]
-		w.Container 			= container
-
-		w.run()
+		s.run(conn, request)
 	case StopCmd:
-		w.Container = Container{Id: request.Args[0]}
-		w.stop()
+		s.stop(conn, request)
 	case RmCmd:
-		w.Container = Container{Id: request.Args[0]}
-		w.rm()
+		s.rm(conn, request)
 	case PsCmd:
-		w.ps()
+		s.ps(conn, request)
 	}
 }
-
 
 func main() {
 	if err := os.RemoveAll(SockAddr); err != nil {
 		log.Fatal(err)
     }
-	
-	l, err := net.Listen("unix", SockAddr)
+
+	server, err := newServer()
     if err != nil {
 		log.Fatal("listen error:", err)
     }
-    defer l.Close()
-	
-	containers := make(map[string]Container, 0)
+    defer server.Listener.Close()
 
 	for {
-		conn, err := l.Accept()
+		conn, err := server.Accept()
         if err != nil {
 			log.Fatal("accept error:", err)
         }
 
-		worker := newWorker(conn, containers)
-
-        go worker.serve()
+        go server.serve(*conn)
     }
 }

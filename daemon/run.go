@@ -155,21 +155,34 @@ func mountFlist(flistPath, fileName, containerDirPath, mountpoint string) (*g8uf
 // server side of run command, it carries the work of mounting flist,
 // after mount success it sends Response message with Success Status, otherwise,
 // it sends Response message with Error status to represent failure.
-func (w *Worker) run() {
-	fileName, err := buildFileName(w.Container.MetaURL)
+func (s *Server) run(conn Connection, request Request) {
+	var container Container
+	if err := json.Unmarshal(request.Body, &container); err != nil {
+		log.Println(err)
+		if err := conn.SendErrorResponse(err.Error()); err != nil {
+			log.Println(err)
+			return
+		}
+		return
+	}
+	container.MetaURL 		= request.Args[0]
+	container.Entrypoint 	= request.Args[1]
+	container.Args 			= request.Args[2:]
+	
+	fileName, err := buildFileName(container.MetaURL)
 	if err != nil {
 		log.Println(err)
-		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+		if err := conn.SendErrorResponse(err.Error()); err != nil {
 			log.Println(err)
 			return
 		}
 		return
 	}
 
-	flistPath, err := getFlist(w.Container.MetaURL, fileName)
+	flistPath, err := getFlist(container.MetaURL, fileName)
 	if err != nil {
 		log.Println(err)
-		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+		if err := conn.SendErrorResponse(err.Error()); err != nil {
 			log.Println(err)
 			return
 		}
@@ -178,7 +191,7 @@ func (w *Worker) run() {
 
 	if err := os.MkdirAll(ContainersPath, 0770); err != nil {
 		log.Println(err)
-		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+		if err := conn.SendErrorResponse(err.Error()); err != nil {
 			log.Println(err)
 			return
 		}
@@ -188,19 +201,19 @@ func (w *Worker) run() {
 	containerDirPath, err := os.MkdirTemp(ContainersPath, fileName)
 	if err != nil {
 		log.Println(err)
-		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+		if err := conn.SendErrorResponse(err.Error()); err != nil {
 			log.Println(err)
 			return
 		}
 		return
 	}
-	s := strings.Split(containerDirPath, "/")
-	containerId := s[len(s)-1]
+	pathSlice := strings.Split(containerDirPath, "/")
+	containerId := pathSlice[len(pathSlice)-1]
 
 	mountpoint := fmt.Sprintf("%s/%s", containerDirPath, "mnt")
 	if err = os.MkdirAll(mountpoint, 0770); err != nil {
 		log.Println(err)
-		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+		if err := conn.SendErrorResponse(err.Error()); err != nil {
 			log.Println(err)
 			return
 		}
@@ -210,65 +223,45 @@ func (w *Worker) run() {
 	fs, err := mountFlist(flistPath, fileName, containerDirPath, mountpoint)
 	if err != nil {
 		log.Println(err)
-		if err := ConnectionErrorResponse(w.Conn, err.Error()); err != nil {
+		if err := conn.SendErrorResponse(err.Error()); err != nil {
 			log.Println(err)
 			return
 		}		
 		return
 	}
 
-	container := Container{
-		Status: 	Running,
-		Id: 		containerId,
-		MetaURL: 	w.Container.MetaURL,
-		FlistName:  fileName,
-		Entrypoint: w.Container.Entrypoint,
-		Args: 		w.Container.Args,
-		Path: 		containerDirPath,
-		Pid:		w.Container.Pid,
-		fs: 		fs,
-	}
-	w.Container = container
-	w.Containers[container.Id] = container
+	container.Status 	 = Running
+	container.Id	 	 = containerId
+	container.FlistName  = fileName
+	container.Path		 = containerDirPath
+	container.Mountpoint = mountpoint
+	container.Fs		 = fs
+
+	s.Containers[container.Id] = container
 
 	defer log.Printf("Container at %v unmounted successfully", containerDirPath)
-	defer w.Container.fs.Unmount()
-	// defer delete(w.Containers, w.Container.Id)
+	defer container.Fs.Unmount()
 
+	responseBody, err := json.Marshal(container)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 	response := Response {
 		Status: Success,
-		Body: 	json.RawMessage([]byte(fmt.Sprintf("{\"mountpoint\": %q}", mountpoint))),
+		Body: 	json.RawMessage(responseBody),
 	}
-	if err := ConnectionWrite(w.Conn, response); err != nil {
+	if err := conn.SendResponse(response); err != nil {
 		log.Println(err)
 		return
 	}
 
-	if err := ConnectionRead(w.Conn, &response); err != nil {
+	container.Status = Stopped
+	if err := conn.ReadResponse(&response); err != nil {
 		log.Println(err)
-		w.Containers[container.Id] = Container{
-			Status: 	Stopped,
-			Id: 		containerId,
-			MetaURL: 	w.Container.MetaURL,
-			FlistName: 	fileName,
-			Entrypoint: w.Container.Entrypoint,
-			Args: 		w.Container.Args,
-			Path: 		containerDirPath,
-			Pid: 		w.Container.Pid,
-			fs: 		fs,
-		}
+		s.Containers[container.Id] = container
 		return
 	}
 
-	w.Containers[container.Id] = Container{
-		Status: 	Stopped,
-		Id: 		containerId,
-		MetaURL: 	w.Container.MetaURL,
-		FlistName: 	fileName,
-		Entrypoint: w.Container.Entrypoint,
-		Args: 		w.Container.Args,
-		Path: 		containerDirPath,
-		Pid: 		w.Container.Pid,
-		fs: 		fs,
-	}
+	s.Containers[container.Id] = container
 }

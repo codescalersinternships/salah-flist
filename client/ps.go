@@ -6,19 +6,29 @@ import (
 	"log"
 	"net"
 	"os"
-	"strings"
 	"text/tabwriter"
 )
 
-type Records struct {
-	Records string
+type Record struct {
+	// Id is container's unique ID, it's same as ContainerName
+	Id string				`json:"id"`
+	// name of downloaded flist meta file used to mount container
+	FlistName string		`json:"flistName"`
+	// Entrypoint is file path for binary to execute as entrypoint in container
+	Entrypoint string		`json:"entrypoint"`
+	// Status is current status of container, it can be "RUNNING" or "STOPPED"
+	Status string			`json:"status"`
 }
 
 // ps lists containers in a tabular format. this is the client side
 // of ps command, at first client sends a request message, then waits daemon to send back response.
 // client manipulates data in response body then present it on STDOUT in tabular format.
 func ps(conn net.Conn) {
-	request := newRequest(os.Args[1], os.Args[2:]...)
+	request, err := newRequest(ClientData{}, os.Args[1], os.Args[2:]...)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	if err := ConnectionWrite(conn, request); err != nil {
 		log.Println(err)
@@ -39,15 +49,15 @@ func ps(conn net.Conn) {
 	}
 
 	if response.Status == Success {
-		var recordsData Records
-		if err := json.Unmarshal(response.Body, &recordsData); err != nil {
+		var records map[string]Record
+		if err := json.Unmarshal(response.Body, &records); err != nil {
 			log.Println(err)
 			return
-		}
-		records := strings.Split(recordsData.Records, ",")
-		
+		}		
 		for _, record := range records {
-			_, err := fmt.Fprintln(w, record)
+			_, err := fmt.Fprintf(w, 
+				"%s\t%s\t%s\t%s\t\n",
+				record.Id, record.FlistName, record.Entrypoint, record.Status)
 			if err != nil {
 				log.Println(err)
 				return

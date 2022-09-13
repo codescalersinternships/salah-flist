@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -11,8 +10,9 @@ import (
 	"syscall"
 )
 
-type MountData struct {
+type ClientData struct {
 	Mountpoint string	`json:"mountpoint"`
+	Pid int				`json:"pid"`
 }
 
 // run mounts container and runs entrypoint process inside it. this is
@@ -22,8 +22,12 @@ type MountData struct {
 // if mounted successfully, client execute the entrypoint process isolated
 // inside container.
 func run(conn net.Conn) {
-	request := newRequest(os.Args[1], os.Args[2:]...)
-	request.Body = json.RawMessage([]byte(fmt.Sprintf("{\"pid\": %d}", os.Getpid())))
+	clientData := ClientData {Pid: os.Getpid()}
+	request, err := newRequest(clientData, os.Args[1], os.Args[2:]...)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 	
 	if err := ConnectionWrite(conn, request); err != nil {
 		log.Println(err)
@@ -45,8 +49,7 @@ func run(conn net.Conn) {
 		return
 	}
 	
-	var mountData MountData
-	if err := json.Unmarshal(response.Body, &mountData); err != nil {
+	if err := json.Unmarshal(response.Body, &clientData); err != nil {
 		log.Println(err)
 		if err := ConnectionErrorResponse(conn, err.Error()); err != nil {
 			log.Println(err)
@@ -59,7 +62,7 @@ func run(conn net.Conn) {
 
 	cmd := exec.Command(os.Args[3], os.Args[4:]...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Chroot: 		mountData.Mountpoint,
+		Chroot: 		clientData.Mountpoint,
 
 		Cloneflags: 	syscall.CLONE_NEWUTS | syscall.CLONE_NEWNET | syscall.CLONE_NEWNS |
 						syscall.CLONE_NEWUSER | syscall.CLONE_NEWPID,

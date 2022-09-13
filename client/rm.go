@@ -11,7 +11,11 @@ import (
 // which does the work of removing container, then waits for a response
 // from daemon to know whether the command was carried successfully or not.
 func rm(conn net.Conn) {
-	request := newRequest(os.Args[1], os.Args[2:]...)
+	request, err := newRequest(ClientData{}, os.Args[1], os.Args[2:]...)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	if err := ConnectionWrite(conn, request); err != nil {
 		log.Println(err)
